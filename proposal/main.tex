@@ -1,0 +1,401 @@
+\documentclass[sigconf]{acmart}
+
+% Remove ACM reference footers for proposal use
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+% Packages
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Title
+\title{Data repair optimization method for geo-distributed fault-tolerant storage systems based on whale optimization algorithm}
+
+% Authors
+
+
+
+\author{Eshwari Mahadeo Khurd}
+\email{khurde@uci.edu}
+\affiliation{
+\institution{University of California, Irvine}
+\city{Irvine}
+\state{California}
+\country{USA}
+}
+
+\renewcommand{\shortauthors}{Srivaths et al.}
+
+\begin{document}
+
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction and Problem Statement}
+
+Modern cloud infrastructure relies on geo-distributed data centers (GDCs) that replicate services across multiple geographic regions. Ensuring data durability across these deployments requires fault-tolerant storage, and Reed-Solomon (RS) erasure codes have become the dominant approach. A (k+s, k) RS code divides data into k blocks, generates parity blocks, and can recover from any s simultaneous node failures — at a fraction of the storage overhead required by full replication.
+
+
+In geo-distributed environments, node failure recovery is costly. Standard repair requires retrieving, decoding, and writing $k$ data fragments across multiple data centers, causing substantial cross-datacenter traffic, high latency due to delays, and network load imbalance.
+
+Xu et al. (2026) define this as the Geo-distributed Erasure Code Repair (GECR) problem: a constrained multi-objective optimization over repair tree topologies that minimizes repair latency, repair traffic, and network load imbalance. They propose the Whale Optimization Algorithm (WOA) as the solver, claiming superiority over four baselines, including one using NSGA-II. Crucially, the choice of WOA over alternatives like PSO and GA is stated but not empirically validated against runs on this specific GECR problem; the comparison relies on WOA literature.
+
+
+This project directly addresses that gap. Rather than simply reproducing the paper's results, I will conduct an independent algorithmic comparison: implementing WOA, PSO, and GA on the same GECR optimization model and evaluating all three on the same network topology and metrics. This isolates the question of whether WOA is genuinely the best metaheuristic choice for this problem class, which the original paper assumes but does not demonstrate.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Methodology}
+
+This project implements and evaluates a repair-tree optimization framework
+for distributed storage repair based on the GECR model described in the
+reference paper. The methodology consists of repair tree modeling,
+multi-objective optimization, metaheuristic algorithm comparison, and
+simulation-based experimental evaluation.
+
+\subsection{Repair Tree Model}
+
+Each repair operation is represented as a directed tree rooted at the node storing the repaired block, with leaf nodes being the surviving data providers. Intermediate nodes perform XOR aggregation of data fragments before forwarding to their parent, reducing raw data volume on bottleneck links. For an (n, k) RS code, a repair tree is encoded as an array of k paths, each describing the route from one leaf to the root through the network graph.
+
+Shortest routing paths are computed using Dijkstra's algorithm. To
+ensure valid candidate repair trees, all structural constraints defined
+in Equations (8)--(15) of the reference model are enforced:
+
+\begin{itemize}
+    \item The repair tree must contain exactly $k+1$ nodes.
+    \item The tree must be loop-free.
+    \item All required data and parity blocks must be covered.
+    \item Candidate trees are validated using a loop-removal procedure.
+\end{itemize}
+
+\subsection{Optimization Objectives}
+
+Two metrics are jointly minimized, following the paper's model exactly:
+\begin{itemize}
+    \item Average repair latency, approximated by fmerge (Eq. 5): the mean depth from each XOR merger node to its farthest leaf. Minimizing this pushes XOR operations close to data sources, reducing the hops that raw unmerged data must travel.
+    \item Network load balance, measured by fnet-load (Eq. 6): the standard deviation of link utilization across all edges. A lower value indicates more uniform traffic distribution.
+\end{itemize}
+The structural constraints on valid repair trees (Eqs. 8–15) are enforced throughout: the tree must contain exactly k+1 nodes, be loop-free, and cover all required data and parity blocks. Dijkstra's algorithm computes shortest paths, and a dedicated loop-removal procedure validates each candidate tree.
+
+
+\subsection{Algorithm Comparison}
+
+Three metaheuristic algorithms will be implemented on the GECR model:
+
+\subsubsection{Whale Optimization Algorithm (WOA)}
+
+WOA follows the three phases defined in the reference paper:
+
+\begin{itemize}
+    \item Contraction and encircling:
+    local search through root replacement and leaf re-routing.
+    
+    \item Random search:
+    diversity preservation via random path substitutions.
+    
+    \item Spiral updating:
+    local refinement along spiral search trajectories.
+\end{itemize}
+
+WOA uses a population size of 100 and 100 iterations.
+
+\subsubsection{Particle Swarm Optimization (PSO)}
+
+Each particle represents a candidate repair tree encoded as a path
+array. Particle velocity updates are implemented as probabilistic
+path swaps guided by:
+
+\begin{itemize}
+    \item Personal best ($p_{best}$)
+    \item Global best ($g_{best}$)
+\end{itemize}
+
+PSO uses the same population and iteration budget as WOA.
+
+\subsubsection{Genetic Algorithm (GA)}
+
+Repair trees are encoded as chromosomes.
+
+\begin{itemize}
+    \item Selection:
+    Tournament selection
+    
+    \item Crossover:
+    Sub-path swapping between parent trees
+    
+    \item Mutation:
+    Random re-routing of one leaf path using Dijkstra
+\end{itemize}
+
+GA uses the same optimization budget as WOA and PSO.
+
+\subsection{Experimental Setup}
+
+Experiments are conducted on a simulation of the U.S. backbone network topology (41 nodes, ref. [47] in the paper), with link bandwidths sampled from configurable ranges. The three algorithms are compared across the same experimental dimensions as the original paper:
+\begin{itemize}
+    \item Experiment I: Vary RS code parameters (n, k) across 8 configurations from (11,7) to (33,18). Metrics: average repair latency, average repair traffic, standard deviation of link utilization.
+    
+    \item Experiment II: Vary bandwidth range from [30–90] to [30–300] Mbps. Same three metrics.
+    
+    \item Experiment III: Vary data block size from 2 MB to 16 MB. Same three metrics.
+    \item Convergence analysis: track fitness per iteration for all three algorithms to compare convergence speed and stability.
+\end{itemize}
+
+\subsection{ LLM Assistance Disclosure}
+
+Claude (Anthropic) was used to help structure the research question, generate the implementation plan, write preliminary Python code, and draft this proposal. Prompts used:
+
+\begin{itemize}
+    \item "I want to implement everything in this paper in 2–3 weeks. Give me a week-by-week implementation flow."
+    \item "Would reproducing the paper or comparing WOA to other algorithms be better? Give me a summary of this paper in detail covering all maths used"
+    \item Q: What's your primary implementation goal?
+A: Just the optimization model + comparison experiments
+
+
+\end{itemize}
+All experimental design decisions, code verification, and analysis were developed independently after AI-assisted scaffolding.
+
+\section{Preliminary Experiments}
+
+A preliminary experiment was conducted on an 8-node weighted network
+graph using a (6, 4) RS code configuration (root node 0, leaf nodes
+3--7). WOA was run with 20 whales over 30 iterations, with both
+objective functions evaluated at each step. The algorithm converged
+rapidly, stabilizing around iteration 10 with a final combined fitness
+of 0.2832 ($f_{merge} = 0.5000$, $f_{net\text{-}load} = 0.0663$),
+compared to 1.1146 for the random initialization. This confirms that
+the full pipeline---graph construction, Dijkstra routing, loop removal,
+repair tree encoding, and WOA optimization---is correctly implemented.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth]{preliminary_results.png}
+    \caption{WOA convergence curve on the 8-node test network.
+             Fitness drops from 0.7831 at iteration 1 and stabilizes
+             at 0.2832 by iteration 10, demonstrating fast convergence
+             of the optimization pipeline.}
+    \label{fig:convergence}
+\end{figure}
+
+\section{Source Code}
+
+The preliminary implementation covers Parts 1--5: network graph
+construction, Dijkstra shortest-path routing with loop removal, repair
+tree encoding, objective function evaluation ($f_{merge}$,
+$f_{net\text{-}load}$), and the WOA main loop. The full project will be
+organized into five modules: \texttt{topology.py},
+\texttt{repair\_tree.py}, \texttt{woa.py}/\texttt{pso.py}/\texttt{ga.py},
+\texttt{baselines.py}, and \texttt{experiments.py}.
+
+\begin{lstlisting}[language=Python,
+                   caption={Preliminary WOA implementation (Parts 1--5)},
+                   label={lst:preliminary},
+                   basicstyle=\ttfamily\scriptsize,
+                   keywordstyle=\color{blue}\bfseries,
+                   commentstyle=\color{gray}\itshape,
+                   numbers=left,
+                   numberstyle=\tiny\color{gray},
+                   breaklines=true,
+                   frame=single]
+import random, math, copy, heapq
+import matplotlib.pyplot as plt
+
+random.seed(42)
+
+NODES = list(range(8))
+EDGES = {
+    (0,1):100, (0,2):80,  (0,3):60,
+    (1,4):90,  (1,5):70,
+    (2,5):110, (2,6):50,
+    (3,6):85,  (3,7):95,
+    (4,5):120, (5,6):75,  (6,7):65,
+}
+GRAPH = {n: {} for n in NODES}
+for (u,v), bw in EDGES.items():
+    GRAPH[u][v] = bw
+    GRAPH[v][u] = bw
+
+ROOT       = 0
+ALL_LEAVES = [3,4,5,6,7]
+K          = 4
+
+def dijkstra(src, dst):
+    dist = {n: -math.inf for n in GRAPH}
+    dist[src] = math.inf
+    prev = {n: None for n in GRAPH}
+    heap = [(-math.inf, src)]
+    visited = set()
+    while heap:
+        neg_d, u = heapq.heappop(heap)
+        if u in visited: continue
+        visited.add(u)
+        for v, bw in GRAPH[u].items():
+            new_bw = min(-neg_d, bw)
+            if new_bw > dist[v]:
+                dist[v] = new_bw
+                prev[v] = u
+                heapq.heappush(heap, (-new_bw, v))
+    path, cur = [], dst
+    while cur is not None:
+        path.append(cur); cur = prev[cur]
+    path.reverse()
+    return path if (path and path[0] == src) else [src, dst]
+
+def remove_loops(path):
+    seen, clean = set(), []
+    for n in path:
+        if n not in seen:
+            seen.add(n); clean.append(n)
+    return clean
+
+def build_path(src, dst):
+    return remove_loops(dijkstra(src, dst))
+
+def random_tree():
+    chosen = random.sample(ALL_LEAVES, K)
+    return [build_path(leaf, ROOT) for leaf in chosen]
+
+EDGE_SET = {(min(u,v), max(u,v)): bw for (u,v), bw in EDGES.items()}
+
+def fmerge(tree):
+    node_count = {}
+    for path in tree:
+        for n in path[:-1]:
+            node_count[n] = node_count.get(n, 0) + 1
+    mergers = {n for n, c in node_count.items() if c > 1}
+    if not mergers:
+        return sum(len(p)-1 for p in tree) / len(tree)
+    depths = []
+    for m in mergers:
+        d = max((p.index(m) for p in tree if m in p), default=0)
+        depths.append(d)
+    return sum(depths) / len(depths)
+
+def fnet_load(tree, block_size=6):
+    traffic = {e: 0 for e in EDGE_SET}
+    for path in tree:
+        for i in range(len(path)-1):
+            e = (min(path[i],path[i+1]), max(path[i],path[i+1]))
+            if e in traffic: traffic[e] += 1
+    utils = [(t * block_size) / bw for (e, bw), t
+             in zip(EDGE_SET.items(), traffic.values())]
+    mean_u = sum(utils) / len(utils)
+    return math.sqrt(sum((u - mean_u)**2 for u in utils) / len(utils))
+
+def fitness(tree):
+    return 0.5 * fmerge(tree) + 0.5 * fnet_load(tree)
+
+def woa():
+    pop = [random_tree() for _ in range(20)]
+    best = min(pop, key=fitness)
+    history = []
+    for t in range(30):
+        a = 2 - 2 * (t / 30)
+        for i in range(len(pop)):
+            h = random.uniform(0, 40)
+            p = random.random()
+            candidate = copy.deepcopy(pop[i])
+            idx = random.randint(0, K-1)
+            if h < 20:
+                candidate[idx] = build_path(
+                    random.choice(ALL_LEAVES), ROOT)
+            elif p < 0.5:
+                candidate = copy.deepcopy(best)
+                candidate[idx] = build_path(
+                    random.choice(ALL_LEAVES), ROOT)
+            else:
+                path = candidate[idx]
+                if len(path) > 2:
+                    mid = path[len(path)//2]
+                    new_path = (build_path(path[0], mid)
+                                + build_path(mid, ROOT)[1:])
+                    candidate[idx] = remove_loops(new_path)
+            if (all(len(p) > 0 for p in candidate)
+                    and fitness(candidate) < fitness(pop[i])):
+                pop[i] = candidate
+            if fitness(pop[i]) < fitness(best):
+                best = copy.deepcopy(pop[i])
+        history.append(fitness(best))
+    return best, history
+
+best_tree, history = woa()
+\end{lstlisting}
+
+
+\section{Future Work}
+
+
+
+
+
+\begin{itemize}
+    \item Build the full 41-node US backbone topology graph with Dijkstra shortest-path routing and loop removal
+    \item Implement repair tree encoding, fmerge and fnet-load objective functions, and unit tests
+    \item Complete the WOA main loop with all three phases (contraction/encircling, random search, spiral update) on the default (n=11, k=7) configuration
+    \item Implement PSO and GA on the same GECR model alongside four baseline stubs: AggreTree, ORT, SRPT, and ERT
+    \item Run Experiments I and II varying (n,k) parameters and bandwidth ranges across all algorithms, 10 trials each, and generate comparison plots
+    \item Run Experiment III sweeping block sizes, perform convergence analysis across all three metaheuristics, and write the final report
+   
+\end{itemize}
+
+
+\begin{table}[h]
+\caption{Project Schedule}
+\centering
+\begin{tabular}{l p{5.5cm} p{3cm}}
+\toprule
+\textbf{Week} & \textbf{Tasks}  \\
+\midrule
+1 & Topology graph, Dijkstra + loop removal, repair tree encoding, \textit{fmerge} + \textit{fnet-load}, unit tests, WOA all 3 phases \\[4pt]
+2 & PSO and GA on GECR model, four baseline stubs (AggreTree, ORT, SRPT, ERT), verify valid repair trees\\[4pt]
+3 & Experiments I \& II: vary (n,k) and bandwidth ranges, 10 trials each, comparison plots  \\[4pt]
+4 & Experiment III (block size sweep), convergence analysis, final report \\[4pt]
+5 & Slide deck, rehearsal, Q\&A prep \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{thebibliography}{6}
+
+\bibitem{xu2026}
+Y. Xu, Y. Wang, F. Jiang, F. Zhou, and J. Chen,
+``Data repair optimization method for geo-distributed fault-tolerant storage systems based on whale optimization algorithm,''
+\textit{Journal of Cloud Computing}, vol. 15, no. 3, 2026.
+https://doi.org/10.1186/s13677-025-00807-z
+
+\bibitem{nadimi2023}
+M. H. Nadimi-Shahraki, H. Zamani, Z. Asghari Varzaneh, and S. Mirjalili,
+``A systematic review of the whale optimization algorithm: theoretical foundation, improvements, and hybridizations,''
+\textit{Archives of Computational Methods in Engineering}, vol. 30, no. 7, pp. 4113--4159, 2023.
+
+\bibitem{zhang2017}
+H. Zhang, H. Li, and S. Y. Li,
+``Repair tree: fast repair for single failure in erasure-coded distributed storage systems,''
+\textit{IEEE Transactions on Parallel and Distributed Systems}, vol. 28, no. 6, pp. 1728--1739, 2017.
+
+\bibitem{xia2020}
+J. Xia, D. Guo, and J. Xie,
+``Efficient in-network aggregation mechanism for data block repairing in data centers,''
+\textit{Future Generation Computer Systems}, vol. 105, pp. 33--43, 2020.
+
+\bibitem{kennedy1995}
+J. Kennedy and R. Eberhart,
+``Particle swarm optimization,''
+in \textit{Proceedings of ICNN'95 --- International Conference on Neural Networks}, vol. 4, pp. 1942--1948, 1995.
+
+\bibitem{holland1992}
+J. H. Holland,
+\textit{Adaptation in Natural and Artificial Systems}.
+Cambridge, MA: MIT Press, 1992.
+
+\end{thebibliography}
+
+\end{document}
