@@ -39,7 +39,7 @@ paper never runs.
 ## Repository Structure
 
 ```
-├── woa_full_experiment.py     # Full WOA vs PSO vs GA implementation
+├── woa_full.py     # Full WOA vs PSO vs GA implementation
 │                              # 41-node topology, all 3 experiments
 ├── preliminary_woa.py         # Parts 1–5: 8-node test, WOA only
 ├── results/
@@ -76,7 +76,7 @@ paper never runs.
 
 ```bash
 pip install matplotlib numpy
-python woa_full_experiment.py
+python woa_full.py
 ```
 
 Change `N_TRIALS = 3` to `N_TRIALS = 10` for final results (takes ~45 min).
